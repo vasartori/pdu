@@ -10,23 +10,30 @@ const char* ssid = "xxx";
 const char* password = "xxx";
 
 AsyncWebServer server(80);
+const int internalLedPin = 2;
 
 void setup() {
   Serial.begin(115200);
 
-
   WiFi.begin(ssid, password);
   WiFi.setSleep(false);
 
-  WiFi.onEvent([](WiFiEvent_t event) {
-    Serial.printf("[WiFi event] %d\n", event);
-  });
+
+  pinMode(internalLedPin, OUTPUT);
+  digitalWrite(internalLedPin, LOW);
 
   Serial.print("Conectando ao Wi-Fi");
   while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
+    digitalWrite(internalLedPin, HIGH);
+    delay(200);
+    digitalWrite(internalLedPin, LOW);
+    delay(200);
     Serial.print(".");
   }
+
+  delay(200);
+  digitalWrite(internalLedPin, HIGH);
+
   Serial.println();
   Serial.print("Conectado! IP: ");
   Serial.println(WiFi.localIP());
@@ -46,18 +53,30 @@ void setup() {
     if (!validaTomada(tomada)) return request->send(400, "application/json", "{\"error\":\"Invalid outlet number\"}");
 
     ligarTomada(tomada - 1);
-    Serial.printf("turn on outlet number: %s", request->pathArg(0));
+    Serial.printf("turn on outlet number: %s\n", request->pathArg(0));
 
     request->send(201, "application/json", "{\"status\":\"Outlet powered on\"}");
   });
 
   // POST /outlet/N/poweroff
-  server.on("^/outlet/(\\d+)/desligar$", HTTP_POST, [](AsyncWebServerRequest *request){
+  server.on("^/outlet/(\\d+)/poweroff$", HTTP_POST, [](AsyncWebServerRequest *request){
     int tomada = request->pathArg(0).toInt();
     if (!validaTomada(tomada)) return request->send(400, "application/json", "{\"error\":\"Invalid outlet number\"}");
     desligarTomada(tomada - 1);
-    Serial.printf("shutting down outlet number: %s", request->pathArg(0));
+    Serial.printf("shutting down outlet number: %s\n", request->pathArg(0));
     request->send(201, "application/json", "{\"status\":\"Outlet powered off\"}");
+  });
+
+  // POST /outlet/N/restart
+  server.on("^/outlet/(\\d+)/restart$", HTTP_POST, [](AsyncWebServerRequest *request){
+    int tomada = request->pathArg(0).toInt();
+    if (!validaTomada(tomada)) return request->send(400, "application/json", "{\"error\":\"Invalid outlet number\"}");
+    desligarTomada(tomada - 1);
+    Serial.printf("shutting down outlet number: %s\n", request->pathArg(0));
+    delay(1000);
+    ligarTomada(tomada -1);
+    Serial.printf("turn on outlet number: %s\n", request->pathArg(0));
+    request->send(201, "application/json", "{\"status\":\"Outlet restarted sucessfully\"}");
   });
 
   // POST /outlet/N/acpi-off
@@ -69,7 +88,7 @@ void setup() {
 
     pulsoTomada(tomada - 1);
     acpiEstado[tomada -1] = false;
-    Serial.printf("pulse sent to outlet nunmber: %s", request->pathArg(0));
+    Serial.printf("pulse sent to outlet nunmber: %s\n", request->pathArg(0));
     request->send(201, "application/json", "{\"status\":\"ACPI power off was sent\"}");
   });
 
@@ -82,7 +101,7 @@ void setup() {
 
     pulsoTomada(tomada - 1);
     acpiEstado[tomada -1] = true;
-    Serial.printf("pulse sent to outlet number: %s", request->pathArg(0));
+    Serial.printf("pulse sent to outlet number: %s\n", request->pathArg(0));
     request->send(201, "application/json", "{\"status\":\"ACPI power on was sent\"}");
   });
 
@@ -110,6 +129,4 @@ void setup() {
 }
 
 
-void loop() {
-
-}
+void loop() {}
